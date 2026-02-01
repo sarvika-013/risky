@@ -7,6 +7,7 @@ class CameraScreen extends StatefulWidget {
   @override
   State<CameraScreen> createState() => _CameraScreenState();
 }
+
 class _CameraScreenState extends State<CameraScreen> {
   CameraController? _controller;
   late Future<void> _initializeControllerFuture;
@@ -16,10 +17,11 @@ class _CameraScreenState extends State<CameraScreen> {
     super.initState();
     _initializeCamera();
   }
+
   Future<void> _initializeCamera() async {
     final cameras = await availableCameras();
 
-    // FRONT CAMERA (selfie)
+    // Pick front camera (selfie)
     final frontCamera = cameras.firstWhere(
       (camera) => camera.lensDirection == CameraLensDirection.front,
     );
@@ -31,24 +33,25 @@ class _CameraScreenState extends State<CameraScreen> {
     );
 
     _initializeControllerFuture = _controller!.initialize();
-    setState(() {});
+
+    if (mounted) setState(() {});
   }
-    @override
+
+  @override
   void dispose() {
     _controller?.dispose();
     super.dispose();
   }
-    @override
+
+  @override
   Widget build(BuildContext context) {
+    // While controller is being created
     if (_controller == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: FutureBuilder(
+    return SafeArea(
+      child: FutureBuilder(
         future: _initializeControllerFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {

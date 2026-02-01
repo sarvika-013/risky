@@ -14,7 +14,6 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   final supabase = Supabase.instance.client;
 
-  final usernameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
@@ -25,26 +24,29 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> handleSignup() async {
     setState(() => isLoading = true);
+
     try {
       final res = await supabase.auth.signUp(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
-        data: {
-          'username': usernameController.text.trim(),
-        },
       );
 
-      // 🔴 Email already exists → redirect to login
-      if (res.user != null && res.session == null) {
-        // ⛔ FORCE LOGOUT
-      await supabase.auth.signOut();
-        _showMessage("Account already exists. Please log in.");
-        setState(() => isLogin = true);
+      // SUCCESS: user OR session returned
+      if (res.user != null || res.session != null) {
+        _showMessage("Account created. Please check your email to confirm.");
         return;
       }
 
-      _showMessage("Check your email to confirm your account.");
+      _showMessage("Signup failed. Please try again.");
     } on AuthException catch (e) {
+      final msg = e.message.toLowerCase();
+
+      // Supabase retry edge case: user already created
+      if (msg.contains('already') || msg.contains('exists')) {
+        _showMessage("Account created. Please check your email to confirm.");
+        return;
+      }
+
       _showMessage(e.message);
     } finally {
       setState(() => isLoading = false);
@@ -73,7 +75,6 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   void dispose() {
-    usernameController.dispose();
     emailController.dispose();
     passwordController.dispose();
     super.dispose();
@@ -93,7 +94,6 @@ class _AuthScreenState extends State<AuthScreen> {
                 success: false,
                 failure: false,
               ),
-
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 400),
                 child: isLogin
@@ -108,7 +108,6 @@ class _AuthScreenState extends State<AuthScreen> {
                       )
                     : SignupForm(
                         key: const ValueKey('signup'),
-                        usernameController: usernameController,
                         emailController: emailController,
                         passwordController: passwordController,
                         onPasswordFocus: (v) =>

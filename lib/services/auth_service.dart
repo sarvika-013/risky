@@ -4,54 +4,53 @@ class AuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
   // Register a new user
-  // Returns SignUpResult with success status and whether email confirmation is required
   Future<SignUpResult> register(String email, String password, String name) async {
     try {
-      // Sign up with Supabase
       final response = await _supabase.auth.signUp(
         email: email,
         password: password,
-        data: {
-          'name': name,
-        },
+        data: {'name': name},
       );
 
-      if (response.user != null) {
-        // Check if session exists (email confirmation may be required)
-        if (response.session != null) {
-          // User is immediately signed in (email confirmation disabled)
-          // Update user metadata with name
-          await _supabase.auth.updateUser(
-            UserAttributes(
-              data: {'name': name},
-            ),
-          );
-          return SignUpResult(
-            success: true,
-            requiresEmailConfirmation: false,
-            message: null,
-          );
-        } else {
-          // Email confirmation is required
-          return SignUpResult(
-            success: true,
-            requiresEmailConfirmation: true,
-            message: 'Account created. Please verify your email.',
-          );
-        }
+      // If Supabase returns user OR session, signup succeeded
+      if (response.user != null || response.session != null) {
+        final requiresConfirmation = response.session == null;
+
+        return SignUpResult(
+          success: true,
+          requiresEmailConfirmation: requiresConfirmation,
+          message: requiresConfirmation
+              ? 'Account created. Please verify your email.'
+              : null,
+        );
       }
+
       return SignUpResult(
         success: false,
         requiresEmailConfirmation: false,
         message: 'Registration failed. Please try again.',
       );
     } on AuthException catch (e) {
+      final msg = e.message.toLowerCase();
+
+      // Supabase retry edge case: user actually already created
+      if (msg.contains('already') ||
+          msg.contains('exists') ||
+          msg.contains('registered') ||
+          _supabase.auth.currentUser != null) {
+        return SignUpResult(
+          success: true,
+          requiresEmailConfirmation: true,
+          message: 'Account created. Please verify your email.',
+        );
+      }
+
       return SignUpResult(
         success: false,
         requiresEmailConfirmation: false,
         message: e.message,
       );
-    } catch (e) {
+    } catch (_) {
       return SignUpResult(
         success: false,
         requiresEmailConfirmation: false,
@@ -61,7 +60,6 @@ class AuthService {
   }
 
   // Login user
-  // Returns Supabase User on success, throws AuthException on failure
   Future<User> login(String email, String password) async {
     try {
       final response = await _supabase.auth.signInWithPassword(
@@ -72,16 +70,16 @@ class AuthService {
       if (response.user != null) {
         return response.user!;
       }
+
       throw AuthException('Login failed. Please try again.');
     } on AuthException {
-      rethrow; // Re-throw to get error message in UI
-    } catch (e) {
+      rethrow;
+    } catch (_) {
       throw AuthException('An unexpected error occurred. Please try again.');
     }
   }
 
-  // Get current logged in user
-  // Returns Supabase User or null
+  // Get current logged-in user
   User? getCurrentUser() {
     return _supabase.auth.currentUser;
   }
@@ -96,7 +94,7 @@ class AuthService {
     return _supabase.auth.currentUser != null;
   }
 
-  // Get Supabase client (for use in other services)
+  // Get Supabase client (for other services)
   SupabaseClient get supabase => _supabase;
 }
 
