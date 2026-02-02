@@ -15,23 +15,30 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
+  final supabase = Supabase.instance.client;
 
   LatLng? currentLocation;
   double _zoom = 13;
 
   StreamSubscription<Position>? _positionStream;
+  Timer? _friendsTimer;
+
   String? avatarUrl;
+  List<Map<String, dynamic>> friendsLocations = [];
+
+  String get myId => supabase.auth.currentUser!.id;
 
   static const mapboxToken =
-      'pk.eyJ1IjoiZmx1dHRlci1sb2ciLCJhIjoiY21peXNucHF4MGp2aDNoczY0b2hvcjRhMCJ9.fZ-6OD0ZqO4twwvBLOdSgA';
+      'pk.eyJ1IjoiZmx1dHRlci1sb2ciLCJhIjoiY21reTlldGphMDNqdTNkcjBub3E1Ym5hdCJ9.lJOm6O5jAdmnLlyvLZ7afg';
 
   String get tileUrl =>
-      'https://api.mapbox.com/styles/v1/flutter-log/cmkrqwd1p001f01r69enga5ly/tiles/256/{z}/{x}/{y}?access_token=$mapboxToken';
+      'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}?access_token=$mapboxToken';
 
   @override
   void initState() {
     super.initState();
     _init();
+    _startFriendsPolling();
   }
 
   Future<void> _init() async {
@@ -40,31 +47,24 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _startTracking() async {
-    final supabase = Supabase.instance.client;
+    if (!await Geolocator.isLocationServiceEnabled()) return;
 
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+    LocationPermission p = await Geolocator.checkPermission();
+    if (p == LocationPermission.denied) {
+      p = await Geolocator.requestPermission();
     }
-
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) return;
+    if (p == LocationPermission.deniedForever ||
+        p == LocationPermission.denied) return;
 
     final me = await supabase
         .from('User')
-        .select('avatar_url, show_location')
-        .eq('user_id', supabase.auth.currentUser!.id)
+        .select('avatar_url')
+        .eq('user_id', myId)
         .maybeSingle();
 
     avatarUrl = me?['avatar_url'];
 
-    final pos = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-    );
-
+    final pos = await Geolocator.getCurrentPosition();
     await _update(pos);
 
     _positionStream = Geolocator.getPositionStream(
@@ -74,41 +74,45 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _update(Position p) async {
-  final ll = LatLng(p.latitude, p.longitude);
+    final ll = LatLng(p.latitude, p.longitude);
+    setState(() => currentLocation = ll);
+    _mapController.move(ll, _zoom);
 
-  setState(() => currentLocation = ll);
-
-  _mapController.move(ll, _zoom);
-
-  final supabase = Supabase.instance.client;
-
-  final res = await supabase.from('user_location').upsert(
-    {
-      'user_id': supabase.auth.currentUser!.id,
+    await supabase.from('user_location').upsert({
+      'user_id': myId,
       'latitude': p.latitude,
       'longitude': p.longitude,
       'updated_at': DateTime.now().toIso8601String(),
-    },
-    onConflict: 'user_id', // <<< IMPORTANT
-  );
-
-  debugPrint("LOCATION UPSERT RESULT: $res");
-}
-
-
-  void _zoomIn() {
-    _zoom = (_zoom + 1).clamp(3, 18);
-    if (currentLocation != null) _mapController.move(currentLocation!, _zoom);
+    }, onConflict: 'user_id');
   }
 
-  void _zoomOut() {
-    _zoom = (_zoom - 1).clamp(3, 18);
-    if (currentLocation != null) _mapController.move(currentLocation!, _zoom);
+  void _startFriendsPolling() {
+    _fetchFriendsLocations();
+    _friendsTimer =
+        Timer.periodic(const Duration(seconds: 5), (_) => _fetchFriendsLocations());
+  }
+
+  Future<void> _fetchFriendsLocations() async {
+    final res = await supabase.from('user_location').select('''
+      user_id,
+      latitude,
+      longitude,
+      User!user_location_user_id_fkey(avatar_url)
+    ''');
+
+    debugPrint("FRIENDS RAW: $res");
+
+    if (mounted) {
+      setState(() {
+        friendsLocations = List<Map<String, dynamic>>.from(res);
+      });
+    }
   }
 
   @override
   void dispose() {
     _positionStream?.cancel();
+    _friendsTimer?.cancel();
     super.dispose();
   }
 
@@ -117,44 +121,52 @@ class _MapScreenState extends State<MapScreen> {
     final center = currentLocation ?? const LatLng(37.7749, -122.4194);
 
     return Scaffold(
-      body: Stack(
+      body: FlutterMap(
+        mapController: _mapController,
+        options: MapOptions(initialCenter: center, initialZoom: _zoom),
         children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(initialCenter: center, initialZoom: _zoom),
-            children: [
-              TileLayer(urlTemplate: tileUrl, userAgentPackageName: 'geo.app'),
-              if (currentLocation != null)
-                MarkerLayer(markers: [
-                  Marker(
-                    point: currentLocation!,
-                    width: 40,
-                    height: 40,
-                    child: CircleAvatar(
-                      radius: 20,
-                      backgroundImage: avatarUrl != null
-                          ? (avatarUrl!.startsWith('http')
-                              ? NetworkImage(avatarUrl!)
-                              : AssetImage(avatarUrl!) as ImageProvider)
-                          : null,
-                      child:
-                          avatarUrl == null ? const Icon(Icons.person) : null,
-                    ),
-                  ),
-                ]),
-            ],
-          ),
+          TileLayer(urlTemplate: tileUrl, userAgentPackageName: 'geo.app'),
 
-          Positioned(
-            right: 16,
-            top: 100,
-            child: Column(children: [
-              FloatingActionButton(
-                  mini: true, onPressed: _zoomIn, child: const Icon(Icons.add)),
-              const SizedBox(height: 8),
-              FloatingActionButton(
-                  mini: true, onPressed: _zoomOut, child: const Icon(Icons.remove)),
-            ]),
+          MarkerLayer(
+            markers: [
+              if (currentLocation != null)
+                Marker(
+                  point: currentLocation!,
+                  width: 40,
+                  height: 40,
+                  child: CircleAvatar(
+                    radius: 20,
+                    backgroundImage: avatarUrl != null
+                        ? AssetImage(avatarUrl!)
+                        : null,
+                    child: avatarUrl == null
+                        ? const Icon(Icons.person)
+                        : null,
+                  ),
+                ),
+
+              ...friendsLocations
+                  .where((e) => e['user_id'] != myId)
+                  .map((e) {
+                final lat = e['latitude'];
+                final lng = e['longitude'];
+                final avatar = e['User']?['avatar_url'];
+                if (lat == null || lng == null) return null;
+
+                return Marker(
+                  point: LatLng(lat, lng),
+                  width: 36,
+                  height: 36,
+                  child: CircleAvatar(
+                    radius: 16,
+                    backgroundImage:
+                        avatar != null ? AssetImage(avatar) : null,
+                    child:
+                        avatar == null ? const Icon(Icons.person, size: 12) : null,
+                  ),
+                );
+              }).whereType<Marker>(),
+            ],
           ),
         ],
       ),

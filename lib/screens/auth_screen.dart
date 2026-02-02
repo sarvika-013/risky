@@ -81,74 +81,101 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              AnimatedAvatar(
-                isPasswordFocused: isPassword,
-                lookValue: lookValue,
-                success: false,
-                failure: false,
-              ),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
-                child: isLogin
-                    ? LoginForm(
-                        key: const ValueKey('login'),
-                        emailController: emailController,
-                        passwordController: passwordController,
-                        onPasswordFocus: (v) =>
-                            setState(() => isPassword = v),
-                        onTextChange: (v) =>
-                            setState(() => lookValue = v),
-                      )
-                    : SignupForm(
-                        key: const ValueKey('signup'),
-                        emailController: emailController,
-                        passwordController: passwordController,
-                        onPasswordFocus: (v) =>
-                            setState(() => isPassword = v),
-                        onTextChange: (v) =>
-                            setState(() => lookValue = v),
-                      ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: isLoading
-                    ? null
-                    : isLogin
-                        ? handleLogin
-                        : handleSignup,
-                child: isLoading
-                    ? const CircularProgressIndicator()
-                    : Text(isLogin ? "Login" : "Sign Up"),
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    isLogin = !isLogin;
-                    isPassword = false;
-                  });
-                },
-                child: Text(
-                  isLogin
-                      ? "Don’t have an account? Sign up!"
-                      : "Already have an account? Login",
-                  style: const TextStyle(
-                    color: Colors.blue,
-                    fontSize: 16,
+Widget build(BuildContext context) {
+  return Scaffold(
+    resizeToAvoidBottomInset: true, // IMPORTANT
+    body: GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(), // dismiss keyboard
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height -
+                  MediaQuery.of(context).padding.top,
+            ),
+            child: IntrinsicHeight(
+              child: Column(
+                children: [
+                  AnimatedAvatar(
+                    isPasswordFocused: isPassword,
+                    lookValue: lookValue,
+                    success: false,
+                    failure: false,
                   ),
-                ),
-              )
-            ],
+
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 400),
+                    child: isLogin
+                        ? LoginForm(
+                            key: const ValueKey('login'),
+                            emailController: emailController,
+                            passwordController: passwordController,
+                            onPasswordFocus: (v) =>
+                                setState(() => isPassword = v),
+                            onTextChange: (v) =>
+                                setState(() => lookValue = v),
+                          )
+                        : SignupForm(
+                            key: const ValueKey('signup'),
+                            emailController: emailController,
+                            passwordController: passwordController,
+                            onPasswordFocus: (v) =>
+                                setState(() => isPassword = v),
+                            onTextChange: (v) =>
+                                setState(() => lookValue = v),
+                          ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  ElevatedButton(
+                    onPressed: isLoading
+                        ? null
+                        : isLogin
+                            ? handleLogin
+                            : handleSignup,
+                    child: isLoading
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(isLogin ? "Login" : "Sign Up"),
+                  ),
+
+                  const Spacer(),
+
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        isLogin = !isLogin;
+                        isPassword = false;
+                      });
+                    },
+                    child: Text(
+                      isLogin
+                          ? "Don’t have an account? Sign up!"
+                          : "Already have an account? Login",
+                      style: const TextStyle(
+                        color: Colors.blue,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
+}
+

@@ -46,7 +46,7 @@ class _HomeContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Expanded(child: MapSection()),
+        const Expanded(child: MapSection()),
         SingleChildScrollView(
           child: Column(
             children: const [
