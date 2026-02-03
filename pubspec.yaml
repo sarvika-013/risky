@@ -20,6 +20,9 @@ dependencies:
   latlong2: ^0.9.1
   geolocator: ^13.0.1
   permission_handler: ^11.3.1
+  gallery_saver_plus: ^3.2.9
+  path_provider: ^2.1.2
+
 
 dev_dependencies:
   flutter_test:

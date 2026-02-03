@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../widgets/map_section.dart';
 import '../widgets/avatar_list.dart';
-import '../widgets/card_section.dart';
+import '../widgets/gallery_section.dart';
 import '../widgets/bottom_nav.dart';
 
 import 'camera_screen.dart';

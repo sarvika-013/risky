@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import '../screens/camera_screen.dart';
+import '../screens/gallery_screen.dart';
 
 class CardSection extends StatelessWidget {
   const CardSection({super.key});
@@ -12,31 +13,41 @@ class CardSection extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
+          // ---------- LIVE CAMERA ----------
           Expanded(
             flex: 2,
             child: GestureDetector(
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const CameraScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const CameraScreen()),
                 );
               },
               child: const _LiveCameraGlassCard(),
             ),
           ),
+
           const SizedBox(width: 16),
+
+          // ---------- CAM ROLL ----------
           Expanded(
             flex: 1,
-            child: _buildCard(),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const GalleryScreen()),
+                );
+              },
+              child: _buildGalleryCard(),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCard() {
+  Widget _buildGalleryCard() {
     return Container(
       height: 220,
       clipBehavior: Clip.antiAlias,
@@ -94,7 +105,7 @@ class CardSection extends StatelessWidget {
   }
 }
 
-/// 🔥 LIVE CAMERA + MIRROR + GLASS EFFECT
+/// ---------- LIVE CAMERA GLASS ----------
 class _LiveCameraGlassCard extends StatefulWidget {
   const _LiveCameraGlassCard();
 
@@ -113,17 +124,11 @@ class _LiveCameraGlassCardState extends State<_LiveCameraGlassCard> {
 
   Future<void> _initCamera() async {
     final cameras = await availableCameras();
-
-    final frontCamera = cameras.firstWhere(
-      (camera) => camera.lensDirection == CameraLensDirection.front,
+    final front = cameras.firstWhere(
+      (c) => c.lensDirection == CameraLensDirection.front,
     );
 
-    _controller = CameraController(
-      frontCamera,
-      ResolutionPreset.medium,
-      enableAudio: false,
-    );
-
+    _controller = CameraController(front, ResolutionPreset.medium);
     await _controller!.initialize();
     if (mounted) setState(() {});
   }
@@ -148,19 +153,15 @@ class _LiveCameraGlassCardState extends State<_LiveCameraGlassCard> {
           : Stack(
               fit: StackFit.expand,
               children: [
-                // 🪞 MIRROR CAMERA PREVIEW
                 Transform(
                   alignment: Alignment.center,
                   transform: Matrix4.identity()..scale(-1.0, 1.0),
                   child: CameraPreview(_controller!),
                 ),
 
-                // 🧊 GLASS / FROSTED BLUR
                 BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Container(
-                    color: Colors.white.withOpacity(0.15),
-                  ),
+                  child: Container(color: Colors.white.withOpacity(0.15)),
                 ),
               ],
             ),
