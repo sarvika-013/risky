@@ -6,11 +6,12 @@ class PhotoViewerScreen extends StatefulWidget {
   final int index;
   final Function(int) onDelete;
 
-  const PhotoViewerScreen(
-      {super.key,
-      required this.photos,
-      required this.index,
-      required this.onDelete});
+  const PhotoViewerScreen({
+    super.key,
+    required this.photos,
+    required this.index,
+    required this.onDelete,
+  });
 
   @override
   State<PhotoViewerScreen> createState() => _PhotoViewerScreenState();
@@ -19,7 +20,8 @@ class PhotoViewerScreen extends StatefulWidget {
 class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   final supabase = Supabase.instance.client;
   late PageController controller;
-  bool info = false;
+
+  bool showInfo = false;
 
   @override
   void initState() {
@@ -27,7 +29,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     controller = PageController(initialPage: widget.index);
   }
 
-  Future<void> delete(int i) async {
+  Future<void> deletePhoto(int i) async {
     final url = widget.photos[i]['image_url'];
     final name = url.split('/').last;
 
@@ -40,50 +42,123 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final h = MediaQuery.of(context).size.height;
+
     return Scaffold(
-        backgroundColor: const Color(0xFF06181C),
-        body: PageView.builder(
-            controller: controller,
-            itemCount: widget.photos.length,
-            itemBuilder: (_, i) {
-              final p = widget.photos[i];
-              return Stack(children: [
-                Center(child: Image.network(p['image_url'])),
+      backgroundColor: const Color(0xFF0B2B30),
+      body: SafeArea(
+        child: PageView.builder(
+          controller: controller,
+          itemCount: widget.photos.length,
+          itemBuilder: (_, i) {
+            final p = widget.photos[i];
 
+            final takenAt = DateTime.parse(p['taken_at']);
+
+            return Stack(
+              children: [
+                /// IMAGE — SLIGHTLY TOWARDS TOP, NO STRETCH
                 Positioned(
-                    bottom: 20,
-                    left: 20,
-                    child: ElevatedButton(
-                        onPressed: () => setState(() => info = !info),
-                        child: const Text("view info"))),
+                  top: h * 0.06,
+                  left: 20,
+                  right: 20,
+                  child: SizedBox(
+                    height: h * 0.58, // 👈 more than half screen
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: Image.network(
+                        p['image_url'],
+                        fit: BoxFit.contain, // 👈 original aspect ratio
+                      ),
+                    ),
+                  ),
+                ),
 
-                if (info)
+                /// INFO CARD — ITS OWN SPACE (NO OVERLAP)
+                if (showInfo)
                   Positioned(
-                      bottom: 80,
-                      left: 20,
-                      right: 20,
-                      child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                              color: Colors.blueGrey.shade100,
-                              borderRadius: BorderRadius.circular(12)),
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(p['taken_at']),
-                                const SizedBox(height: 6),
-                                const Text("Location"),
-                                Text("Lat: ${p['latitude']}"),
-                                Text("Lng: ${p['longitude']}"),
-                              ]))),
-
-                Positioned(
+                    top: h * 0.66,
+                    left: 20,
                     right: 20,
-                    bottom: 20,
-                    child: IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => delete(i)))
-              ]);
-            }));
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.shade100,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "${takenAt.day.toString().padLeft(2, '0')}.${takenAt.month.toString().padLeft(2, '0')}.${takenAt.year % 100}",
+                              ),
+                              Text(
+                                "${takenAt.hour.toString().padLeft(2, '0')}:${takenAt.minute.toString().padLeft(2, '0')}",
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            "Location",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text("Latitude: ${p['latitude']}"),
+                          Text("Longitude: ${p['longitude']}"),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                /// BOTTOM NAV — FIXED
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.35),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal.shade200,
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              showInfo = !showInfo;
+                            });
+                          },
+                          child: const Text("view info"),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => deletePhoto(i),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
   }
 }

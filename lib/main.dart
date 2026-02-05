@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
+import '../screens/home_screen.dart';
 import 'auth_gate.dart';
 
 Future<void> main() async {
@@ -21,7 +21,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: AuthGate(), // ✅ auth decides screen
+      home: HomeScreen(), // ✅ auth decides screen
     );
   }
 }

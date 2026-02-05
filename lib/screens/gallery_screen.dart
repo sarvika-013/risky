@@ -12,49 +12,93 @@ class GalleryScreen extends StatefulWidget {
 class _GalleryScreenState extends State<GalleryScreen> {
   final supabase = Supabase.instance.client;
   List photos = [];
+  bool loading = true;
 
   @override
   void initState() {
     super.initState();
-    load();
+    loadPhotos();
   }
 
-  Future<void> load() async {
+  Future<void> loadPhotos() async {
     final res = await supabase
         .from('photo')
         .select()
         .order('taken_at', ascending: false);
 
-    setState(() => photos = res);
+    setState(() {
+      photos = res;
+      loading = false;
+    });
   }
 
-  void remove(int i) {
-    setState(() => photos.removeAt(i));
+  void removePhoto(int index) {
+    setState(() {
+      photos.removeAt(index);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(title: const Text("Gallery")),
-        body: GridView.builder(
-            padding: const EdgeInsets.all(8),
-            gridDelegate:
-                const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2),
-            itemCount: photos.length,
-            itemBuilder: (_, i) {
-              return GestureDetector(
-                onTap: () async {
-                  await Navigator.push(
+      backgroundColor: const Color(0xFF0B2B30),
+      appBar: AppBar(
+        title: const Text('Camera Roll'),
+        backgroundColor: const Color.fromARGB(255, 255, 255, 255),
+        elevation: 0,
+      ),
+
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : GridView.builder(
+              padding: const EdgeInsets.all(16),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+              ),
+              itemCount: photos.length,
+              itemBuilder: (context, index) {
+                final photo = photos[index];
+
+                return GestureDetector(
+                  onTap: () async {
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => PhotoViewerScreen(
-                                photos: photos,
-                                index: i,
-                                onDelete: remove,
-                              )));
-                },
-                child: Image.network(photos[i]['image_url'], fit: BoxFit.cover),
-              );
-            }));
+                        builder: (_) => PhotoViewerScreen(
+                          photos: photos,
+                          index: index,
+                          onDelete: removePhoto,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.black26,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        photo['image_url'],
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          );
+                        },
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(Icons.broken_image, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
   }
 }
